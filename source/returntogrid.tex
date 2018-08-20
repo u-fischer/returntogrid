@@ -1,0 +1,409 @@
+% !Mode:: "TeX:UTF-8:Main"
+\makeatletter
+\def\UlrikeFischer@package@version{0.1}
+\def\UlrikeFischer@package@date{2018/08/20}
+\makeatother
+%\PassOptionsToPackage{enable-debug}{expl3}
+\documentclass[twoside,parskip=half-,fontsize=12pt,egregdoesnotlikesansseriftitles,headings=normal]{scrartcl}
+\usepackage[english]{babel}
+\usepackage[autostyle]{csquotes}
+\usepackage{microtype}
+%\DisableLigatures{encoding = T1, family = tt* }
+\usepackage{fourier}
+\renewcommand\ttdefault{lmtt}
+\usepackage{ydoc-desc}
+\usepackage{needspace}
+\usepackage{returntogrid}
+\usepackage{geometry}
+
+\usepackage{tikz}
+\usepackage{enumitem}
+\raggedbottom
+
+\title{The returntogrid package, v\csname UlrikeFischer@package@version\endcsname}
+\date{\csname UlrikeFischer@package@date\endcsname}
+\author{Ulrike Fischer\thanks{fischer@troubleshooting-tex.de}}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily, columns=fullflexible,language=[LaTeX]TeX,aboveskip=0pt}
+
+\makeatletter
+\lst@AddToHook{PreInit}{\returntogrid} %works here but should be checked. A local key would be better. 
+
+\begin{document}
+\maketitle
+
+
+\section{Introduction}
+
+This package offers a few commands to get something like an simple, semi-automatic grid typesetting. It does more or less what the existing \texttt{gridset} package does. The main differences to \texttt{gridset} are that \texttt{returntogrid} works also with lualatex, that it has also a command to do some horizontal movements, that it uses internally expl3 and that it does much less \enquote{security} checks: It actually started only as internal code, where I had good control about the use of the commands. Then I thought it would be useful to externalize it in case I needed it for more projects and added a thin wrapper of user commands.
+
+It probably also has more bugs -- report these  at the issue tracker at github \\ \textbf{https://github.com/u-fischer/returntogrid}.
+
+\section{Vertical grid moves}
+
+\subsection{Restrictions / Deficiencies:  Grid typesetting is not easy}
+
+
+The problem is at first that there are so many things that can destroy the grid:
+
+\begin{itemize}[nosep]
+\item different font sizes with their different leading,
+\item all the various skips around and in lists, around math, around floats,
+\item pictures and tabulars (e.g. because of lines) often don't fit the grid,
+\item the way \TeX\ handles large boxes: People e.\,g. quite often believe that a tabular with three rows of normal height shouldn't disturb the grid but it does:
+
+\smallskip
+
+\tikz[overlay]\draw[red,dashed](0,0) --++ (3cm,0)
+(0,-\baselineskip) --++ (3cm,0)
+(0,-2\baselineskip) --++ (3cm,0)
+(0,-3\baselineskip) --++ (3cm,0)
+(0,-4\baselineskip) --++ (3cm,0);some text\\*
+\begin{tabular}[t]{l}
+tabular row 1\\
+tabular row 2\\
+tabular row 3
+\end{tabular}\\*
+some text not on the grid
+
+\smallskip
+\item and more
+\end{itemize}
+
+
+Getting back to the grid isn't trivial either. In many cases it can be done by inserting a suitable vertical space. But due to the way \TeX\ builds the page the needed amount can normally only be calculated in a second compilation. As the inserted space changes the following text probably new compilations are needed. So it can take a long time until everything is stable -- if a stable solution actually exists: stretchable space, floats that move around and problems at page breaks can actually prevent a stable state.
+
+
+So you want to use this package be aware of the following restrictions:
+
+\begin{enumerate}
+\item It will only work with documents/pages which uses \cs{raggedbottom}.
+\item Many \cs{returntogrid} commands means many compilations. So use the command only when really needed. Setup as many spaces of lists and sectioning commands so that \pkg{returntogrid} is not needed to keep the grid.
+\item Objects at/after page breaks needs special care, see section \ref{sec:pagebreak}.
+\item Top floats could be a real problem.
+\item The code uses for comparision the y-coordinate of a point in the text upper corner of the first page. (Such coordinates are measured from the \emph{bottom} of the page.) You will get nonsensical results if you change the geometry in the middle of your document unless you setup a new reference point and tell \cs{returntogrid} to use it.
+\item The skips to return to the grid should normally be inserted only on the main vertical list, not in boxes. But the code doesn't check for inner mode as there could be special cases where it works (e.g. in a tcolorbox). If you use \cs{returntogrid} in such a place think carefully if this can lead to a stable state.
+\end{enumerate}
+
+\Needspace{8\baselineskip}
+\subsection{The main command}
+
+The main command is called \cs{returntogrid} and it takes one \emph{optional} argument:
+
+\DescribeMacro\returntogrid[<key-val-list>]
+
+The command is used for both type of \enquote{moves}: vertical and horizontal. In this section I'm describing the vertical movements, for horizontal movements see section \ref{sec:nextgridtab}.
+
+Without the optional argument the command should normally be used only at the begin of paragraphs.  It will force a new paragraph by issuing a \cs{par}, start the paragraph with a \cs{leavevmode}, then store the current position of the baseline and at the next compilation insert after the \cs{par} a hopefully suitable vskip to move this position to the grid.
+
+It will always insert a \emph{positive} vskip, even if the previous grid position is much nearer -- I thought about small negative spaces but I'm not sure that this leads to a stable state.
+
+
+In the optional argument the following keys can be used:
+
+\begin{description}
+\item[\PrintKeyName{save}] Value is a label name. With this option \cs{returntogrid} only issues a \cs{leavevmode} and stores the position but doesn't insert any space and doesn't force a new paragraph. With this option a use inside boxes makes sense (see below).
+
+\item[\PrintKeyName{use}] Value is a label name. With this option \cs{returntogrid} only inserts the vskip needed to move the position stored with the \PrintKeyName{save} option to the grid.
+
+   This can be e.g. used to move a section title or a line of a tabular to the grid
+
+   \begin{lstlisting}
+   \returntogrid[use=mysec]
+   \section[xxxabc]{\returntogrid[save=mysec,strut=1]xxxabc}
+
+   \returntogrid[use=mytab]
+   \begin{tabular}[t]{l}
+   \hline
+   \returntogrid[save=mytab]xxxabc
+   \end{tabular}
+   \end{lstlisting}
+
+
+\item[\PrintKeyName{label}] Value is a label name. By default \cs{returntogrid} generates numbered label names. This means that if you insert a new \cs{returntogrid} command at the begin of the document all following label names have to be renumbered and all skip calculated anew. As this can need lots of compilations you can avoid this by giving the label a unique name manually. Internally a package specific prefix is always added to the label.
+
+
+\item[\PrintKeyName{strut}] Value is an integer. This will insert a strut of height $ n \times  \cs{baselineskip} + \cs{topskip} $. See section \ref{sec:pagebreak} why this could be needed.
+
+\item[\PrintKeyName{debug-vgrid}]  This adds the command \cs{showdebugpagegrid} to the background of the current page.
+
+\end{description}
+
+You should ensure that \cs{returntogrid} isn't use in arguments that wander to the toc or the header as this would give multiply defined labels or insert the vskip in places where you don't want it.
+
+Also it is up to you to use the save-use system in a sensible way -- if the vskip doesn't move the position or if you use the vskip twice you probably will never get a stable position.
+
+\subsection{The page break problem}\label{sec:pagebreak}
+
+The space inserted to force an object onto the grid can push the object to a new page.
+
+This is a problem if the object doesn't fall naturally on the grid there. In this case one would need a second (non-discardable) space that moves the object further down.
+
+Currently the code doesn't do this. Instead it expects you to set the height of such problematic objects so that they keep the grid naturally.
+
+
+\subsection{Top floats}
+
+Floats at the top of the page can disturb the grid too.  There is normally no sensible place to insert a vskip in the text running below such a float to return to the grid. This means that you should either avoid top floats, or give them a height that pushes the text below onto the grid without manual adjustments.
+
+\Needspace{10\baselineskip}
+\subsection{Debugging: Showing the grid}
+
+\DescribeMacro\showdebugpagegrid
+
+This command requires that you load the package \pkg{tikz}. You can then use it e.g. like this to see the vertical grid lines:
+
+\begin{lstlisting}
+\AddToShipoutPictureBG {\AtTextUpperLeft{\showdebugpagegrid}}
+\end{lstlisting}
+
+
+\section{Horizontal grid: going to the next tab position}\label{sec:nextgridtab}
+
+The \cs{returntogridsetup} command described in the following section has a key to define lists of \enquote{tab positions}. It takes two argument: an (unique) name for the tab list and a list of dimension expressions\footnote{This means that e.\,g. sums of length are allowed.}.
+
+\PrintKeyName{settabpositions}=\MacroArgs{<name>}\MacroArgs{<dim expression>','<dim expression>,\ldots}
+
+The tab positions are set from the position you are issuing the command, and the dimensions describe the distance between two tabs. The command doesn't insert spaces but it uses a zero-width box, so use it at a places where a such a box doesn't affect your layout. The tabs must be set before the first use.
+
+
+So
+
+\begin{lstlisting}
+abc%
+\returntogridsetup
+ {
+  settabpositions={demo}{1cm,2\fboxsep +1cm, 2cm}
+ }%
+text
+\end{lstlisting}
+
+sets the following tab positions for the list \enquote{demo}:
+
+abc%
+\returntogridsetup
+ {
+  debug-tab,
+  settabpositions={demo}{1cm,2\fboxsep +1cm, 2cm}
+ }%
+text
+
+\subsection{Moving to the next tab position}
+
+You can move to the next tab position by using the \PrintKeyName{tab} key in the optional argument of \cs{returntogrid}:
+
+
+\Macro\returntogrid[tab=\meta{name}]
+
+
+The name refers to the name of the tab list from which you want to use tab positions. If you don't give a name, whatever is the currently active tab list name  will be used e.g. the one set with the \PrintKeyName{tab-list} option described in section \ref{sec:setup}. If no list with the name exists an error will be raised.
+
+The code is \emph{very} simple: It issues a \cs{leavevmode}, stores the current position in a label and at the next compilation calculates the distance to the next tab position and inserts a suitable \verb+\hspace*+. If there is no next tab position it inserts a \cs{hfill} unless the key \PrintKeyName{hfill} has been set to false. It doesn't try to avoid line breaks or overfull lines.
+
+The current position is stored with a automatically generated numbered label. Like in the case of the vertical movements you can avoid that this names changes all the time you add a command by setting a manual name with the key \PrintKeyName{label}.
+
+As with vertical movements \cs{returntogrid} has a number of restrictions:
+
+\begin{itemize}
+\item Pay attention to stretchable space! If you move something to the end of the line, if you have a positive \cs{parfillskip} value, if the movement gives an overfull hbox, \LaTeX\ will perhaps change the word spaces and then no stable hspace value can be found.  Use \cs{raggedright} or end the lines with \verb+\\+.
+
+    I advise against setting an explizit tab position at the right margin, it is often unstable (and as the code inserts an \cs{hfill} after the last tab not needed anyway).
+
+
+\item Don't misuse the command! It is not a replacement for a real tabular or a tabbing as many \cs{returntogrid} in one line or one paragraph can mean many compilations. But it is useful if you want to move e.g. graphics in a three column layout.
+\end{itemize}
+
+
+
+\section{Setup and configuration}\label{sec:setup}
+
+\DescribeMacro\returntogridsetup{<key-val-list>}
+
+With this command you can change some defaults of the package.
+
+\begin{description}
+\item[\PrintKeyName{active}] Boolean, default is true. It deactivates following \cs{returntogrid} commands.
+
+\item[\PrintKeyName{step}] Value is a length, the default is \cs{baselineskip}. It sets the distance of the vertical grid.
+
+\item[\PrintKeyName{reference}] The name of the point used as reference for the vertical grid. The default is a point at the text upper corner stored like this:
+
+\begin{lstlisting}
+\AddToShipoutPictureBG*{%
+ \AtTextUpperLeft{%
+  \zsaveposy{ufgrid@vpointtextupperleft}}}
+\end{lstlisting}
+
+\item[\PrintKeyName{offset}] Value is a length, the default is \cs{topskip}. The reference point doesn't need to be on the grid, this key sets the offset.
+
+\item[\PrintKeyName{settabpositions}] This stores tab positions that can be use with the \cs{nextgridtab} command See section \ref{sec:nextgridtab}.
+
+\item[\PrintKeyName{tab-list}] Value a name. This sets the name of tab-list that will be used if you don't give a name explictely until the enclosing group end.
+
+\item[\PrintKeyName{hfill}] Boolean. Default is true. When set to false no \cs{\hfill} is inserted after the last tab position.
+
+ \item[\PrintKeyName{debug-tab}] This helps to see horizontal tabs when defining them. It should be used before using   \PrintKeyName{settabpositions}. It needs the package \pkg{tikz}.
+\end{description}
+
+
+
+
+
+
+\newpage
+\section{Examples}
+
+\returntogrid In the following text all parts with XXX are forced by the package to return to the grid.
+
+First some horizontal movements:
+
+\noindent
+\returntogridsetup{
+ debug-tab,
+ settabpositions={main}{0.3\textwidth,0.3\textwidth+0.05\textwidth},
+ tab-list={main}
+ }
+
+
+\noindent abc\returntogrid[tab]X
+
+\noindent abc\returntogrid[tab,label=mine]X
+
+\noindent more text more text more text \returntogrid[tab]X
+
+\noindent more text more text more text more text more text\returntogrid[tab]X
+
+\noindent more text more text more text more text more text more text more text\returntogrid[tab]X
+
+\minisec{The code}
+
+\begin{lstlisting}[breaklines]
+\noindent
+\returntogridsetup{
+ debug-tab,
+ settabpositions={main}{0.3\textwidth,0.3\textwidth+0.05\textwidth},
+ tab-list={main}
+ }
+
+
+\noindent abc\returntogrid[tab]X
+
+\noindent abc\returntogrid[tab,label=mine]X
+
+\noindent more text more text more text \returntogrid[tab]X
+
+\noindent more text more text more text more text more text\returntogrid[tab]X
+
+\noindent more text more text more text more text more text more text more text\returntogrid[tab]X
+\end{lstlisting}
+
+
+\newpage
+\AddToShipoutPictureBG {\AtTextUpperLeft{\showdebugpagegrid}}
+moving something to the next page
+\vspace*{29,1\baselineskip}
+\returntogrid[use=mysec1]
+\section[]{\returntogrid[save=mysec1,strut=1]XXX}
+\rule{0.4pt}{3cm}
+
+
+
+\minisec{The code}
+
+\begin{lstlisting}
+\vspace*{29,1\baselineskip}
+\returntogrid[use=mysec1]
+\section[]{\returntogrid[save=mysec1,strut=1]XXX}
+\rule{0.4pt}{3cm}
+\end{lstlisting}
+
+
+\newpage
+
+\begin{itemize}[itemsep=3pt]
+\item abc
+
+\item \returntogrid abc
+
+\item \returntogrid abc
+\end{itemize}
+
+\minisec{The code}
+\begin{lstlisting}
+\begin{itemize}[itemsep=3pt]
+\item abc
+
+\item \returntogrid abc
+
+\item \returntogrid abc
+\end{itemize}
+\end{lstlisting}
+
+\newpage
+a
+
+\vspace{3pt}
+
+\returntogrid
+xxxa
+
+
+
+\returntogrid
+\LARGE xxxabc
+\normalsize
+
+
+
+\returntogrid[use=mytab]
+\begin{tabular}[t]{l}
+\returntogrid[save=mytab]xxxsome text\\
+some text\\
+some text\\
+some text\\
+some text\\
+some text\\
+some text \\some text\\some text
+\end{tabular}
+
+\returntogrid[use=mysec2]
+\section[]{\returntogrid[save=mysec2,strut=1]xxxabc}
+
+abc \\abc
+
+\newpage 
+\ClearShipoutPictureBG
+\minisec{The code}
+\begin{lstlisting}
+a
+
+\vspace{3pt}
+
+\returntogrid
+xxxa
+
+
+
+\returntogrid
+\LARGE xxxabc
+\normalsize
+
+
+
+\returntogrid[use=mytab]
+\begin{tabular}[t]{l}
+\returntogrid[save=mytab]xxxsome text\\
+some text\\
+some text\\
+some text\\
+some text\\
+some text\\
+some text \\some text\\some text
+\end{tabular}
+
+\returntogrid[use=mysec2]
+\section[]{\returntogrid[save=mysec2,strut=1]xxxabc}
+
+abc \\abc
+\end{lstlisting}
+\end{document}

@@ -1,0 +1,41 @@
+% !Mode:: "TeX:DE:UTF-8:Main"
+%\input{regression-test}
+\documentclass{article}
+\usepackage{returntogrid}
+\usepackage{tikz}
+\AddToShipoutPictureBG {\AtTextUpperLeft{\showdebugpagegrid}}
+\begin{document}
+%\START\showoutput
+\rule{4cm}{1cm}
+
+\returntogrid
+XXXX
+
+
+\newpage
+\returntogrid[use=grid:testlabela]
+\rule{4cm}{1cm}
+
+
+\returntogrid[save=grid:testlabela]xxxx\zsavepos{test}\returntogrid[save=grid:testlabelb]
+
+\zposy{ufgrid@usergrid:testlabela}, \zposy{ufgrid@usergrid:testlabelb}
+
+\newpage
+blb
+
+\returntogridsetup{
+ debug-tab,
+ settabpositions={main}{1cm,2cm,1cm+2cm},
+ tab-list={main}
+ }
+
+\returntogrid[tab]abc
+
+xxxxxxxx\returntogrid[tab]abc
+
+xxxxxxxxxxxxxxxxxxxx\returntogrid[tab]abc
+
+xxxxxxxxxxxxxxxxxxxxxxxxxx\returntogrid[tab]abc\returntogrid[tab]abc
+
+\end{document}

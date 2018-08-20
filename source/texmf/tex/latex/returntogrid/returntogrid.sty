@@ -1,0 +1,396 @@
+\RequirePackage{xparse}
+
+\ProvidesExplPackage {returntogrid} {2018/08/12} {0.1}
+ {return to a grid position}
+% \debug_on:n { check-expressions,deprecation } % needs enable-debug
+\RequirePackage{eso-pic}
+\RequirePackage{zref-savepos,zref-abspage}
+
+\msg_new:nnn {ufgrid} {tikz-needed}        { the~showdebugpagegrid~command~needs~the~tikz~package }
+\msg_new:nnn {ufgrid} {tab-list-unknown}   { the~tab~list~"#1"~has~not~been~declared}
+
+\sys_if_engine_luatex:T
+{
+ \directlua{require ("returntogrid.lua")}
+}
+
+\int_new:N       \l__ufgrid_vskip_int %vskip in sp
+\int_new:N       \g__ufgrid_vpoint_int %for the v-labels
+\int_new:N       \g__ufgrid_hpoint_int   %for the h-labels of tabs
+\int_new:N       \l__ufgrid_tempa_int
+
+\bool_new:N      \g__ufgrid_active_bool
+\bool_gset_true:N \g__ufgrid_active_bool
+\bool_new:N      \l__ufgrid_hmode_bool   %hmode (tabs)
+\bool_new:N      \l__ufgrid_savepos_bool %save position
+\bool_new:N      \l__ufgrid_insert_vskip_bool %insert vskip
+\bool_new:N      \l__ufgrid_autolabel_bool %numbered labels
+\bool_new:N      \l__ufgrid_tabfound_bool
+\bool_new:N      \l__ufgrid_hfill_bool
+\bool_new:N      \l__ufgrid_debug_tab_bool
+
+\tl_new:N        \l__ufgrid_setup_step_tl   %step value (dim in sp)
+\tl_new:N        \l__ufgrid_setup_reference_tl %name of reference point
+\tl_new:N        \l__ufgrid_setup_offset_tl %an offset, e.g. topskip
+\tl_new:N        \l__ufgrid_label_tl        %holds the label name
+\tl_new:N        \l__ufgrid_curpos_tl
+\tl_new:N        \g__ufgrid_prefix_vpoint_tl %prefix of  v-point labels
+\tl_new:N        \g__ufgrid_prefix_tabpos_tl %prefix for tab positions
+\tl_new:N        \g__ufgrid_prefix_hpoint_tl %prefix for h-point labels
+\tl_new:N        \g__ufgrid_prefix_user_tl   %prefix for labels provided by the user
+\tl_new:N        \l__ufgrid_tab_list_tl     %holds the name of the current tab list
+\tl_new:N        \l__ufgrid_debug_tab_draw_tl %hold the draw command to debug tab positions
+\tl_new:N        \l__ufgrid_tmp_vskip_tl     % to pass the vskip to zsavepos
+
+\dim_new:N       \l__ufgrid_debug_tab_dim
+
+\prop_new:N      \g__ufgrid_vskip_prop %will hold the vskips by label name
+
+\cs_generate_variant:Nn \prop_gput:Nnn {Nxx}
+\cs_generate_variant:Nn \prop_get:NnNTF {NxNTF}
+\cs_generate_variant:Nn \prop_get:NnNF {NxNF}
+
+% we need to store the current displacement
+\zref@newprop {ufgridvskip}[0]{\int_use:N \l__ufgrid_vskip_int}
+\zref@addprop {savepos} {ufgridvskip}
+\zref@addprop {savepos} {abspage}
+
+
+\keys_define:nn { ufgrid / setup}
+{
+ activate         .bool_gset:N = \g__ufgrid_active_bool,
+ % step = dimension
+ step             .code:n   = { \tl_set:Nx \l__ufgrid_setup_step_tl { \dim_to_decimal_in_sp:n {#1} } },
+ % reference = labelname (label should be set with zsavepos)
+ reference        .tl_set:N  = \l__ufgrid_setup_reference_tl,
+ % offset = dimension: move down (example offset= \topskip)
+ offset           .code:n    = { \tl_set:Nx \l__ufgrid_setup_offset_tl { \dim_to_decimal_in_sp:n {#1} } },
+ tab-list         .tl_set:N  = \l__ufgrid_tab_list_tl,
+ settabpositions  .code:n    = { \__ufgrid_settabpositions:nn #1 },
+ prefix-vpoint    .tl_gset:N = \g__ufgrid_prefix_vpoint_tl,
+ prefix-tabpos    .tl_gset:N = \g__ufgrid_prefix_tabpos_tl,
+ prefix-hpoint    .tl_gset:N = \g__ufgrid_prefix_hpoint_tl,
+ prefix-user      .tl_gset:N = \g__ufgrid_prefix_user_tl,
+ debug-tab        .bool_set:N= \l__ufgrid_debug_tab_bool,
+ debug-tab-len    .dim_set:N = \l__ufgrid_debug_tab_dim,
+ debug-tab-draw   .tl_set:N  = \l__ufgrid_debug_tab_draw_tl,
+ hmode            .bool_set:N= \l__ufgrid_hmode_bool,
+ hfill            .bool_set:N= \l__ufgrid_hfill_bool,
+ tab              .code:n    =
+   {
+    \tl_if_empty:nF { #1 }
+    {
+     \tl_set:Nn \l__ufgrid_tab_list_tl {#1}
+    }
+    \bool_set_true:N \l__ufgrid_hmode_bool
+   }
+}
+
+\normalsize %just in case
+\keys_set:nn { ufgrid / setup }
+ {
+  prefix-vpoint = ufgrid@vpoint,
+  prefix-tabpos = ufgrid@tabpos,
+  prefix-hpoint = ufgrid@hpoint,
+  prefix-user   = ufgrid@user,
+  step          = \baselineskip,
+  reference     = \g__ufgrid_prefix_vpoint_tl textupperleft,
+  offset        = \topskip,
+  debug-tab-len = -4cm,
+  debug-tab-draw= { \draw[blue,dashed] (0,1em)--++(0,\l__ufgrid_debug_tab_dim) },
+  hfill
+ }
+
+
+\keys_define:nn { ufgrid / use }
+ {
+  __savepos      .bool_set:N  =  \l__ufgrid_savepos_bool,
+  __insert_vskip .bool_set:N  =  \l__ufgrid_insert_vskip_bool,
+  __label        .tl_set:N    =  \l__ufgrid_label_tl,
+  __autolabel    .bool_set:N  =  \l__ufgrid_autolabel_bool,
+  save           .meta:n      = { __label=\g__ufgrid_prefix_user_tl#1, __savepos=true, __insert_vskip=false,__autolabel=false },
+  save           .value_required:n = true,
+  label          .meta:n      = { __label=\g__ufgrid_prefix_user_tl#1, __autolabel=false },
+  label          .value_required:n = true,
+  use            .meta:n      =
+    {
+     __label=\g__ufgrid_prefix_user_tl#1, __savepos=false, __insert_vskip=true,__autolabel=false
+     },
+  use            .value_required:n = true,
+  strut          .code:n          = \__ufgrid_insert_ufgridstrut:n { #1 },
+  hmode          .bool_set:N      = \l__ufgrid_hmode_bool,
+  tab-list       .tl_set:N        = \l__ufgrid_tab_list_tl,
+  tab            .code:n          =
+   {
+    \tl_if_empty:nF { #1 }
+    {
+     \tl_set:Nn \l__ufgrid_tab_list_tl {#1}
+    }
+    \bool_set_true:N \l__ufgrid_hmode_bool
+   },
+  debug-vgrid    .code:n = {\AddToShipoutPictureBG*{\AtTextUpperLeft{\showdebugpagegrid}}}
+ }
+
+
+%%calculate the vskip to insert
+  %#1 = diff to a point on the grid
+  %#2 = currently used vskip,
+  %#3 = step
+  % all values integers =dim in sp!
+\sys_if_engine_luatex:TF
+ {
+  \cs_new:Nn \__ufgrid_calculate_vskip:nnn
+   { \directlua { returntogrid.ufgridvskip (#1,#2,#3) } }
+ }
+ {
+  \cs_new:Nn \__ufgrid_calculate_vskip:nnn
+  {
+   \int_eval:n
+    {
+     \int_mod:nn
+      {
+       #2 + #3 - \int_mod:nn { #1 }{ #3 }
+      }
+      {#3}
+    }
+   }
+ }
+
+
+\cs_new:Nn \__ufgrid_calculate_vskip:n %#1 =labelname
+ {
+  \__ufgrid_calculate_vskip:nnn
+   { %diff
+    \zposy{\l__ufgrid_setup_reference_tl} - \l__ufgrid_setup_offset_tl - \zposy{#1}
+   }
+   { %current vskip
+    \zref@extractdefault{#1-vskip} {ufgridvskip} {0}
+   }
+   {
+    \l__ufgrid_setup_step_tl
+   }
+ }
+
+\cs_new_protected:Nn \__ufgrid_savepos:n %#1 label name
+ {
+  \leavevmode\strut
+  \zsavepos{#1}
+ }
+
+
+\cs_new_protected:Nn \__ufgrid_insert_vskip:n %#1 label name
+ {
+  \par
+  \int_compare:nT { \zposy{#1} != 0 }
+   {
+    %calculate the needed vskip base on the ypos and the old vskip
+    \int_set:Nn \l__ufgrid_vskip_int
+    {
+     \__ufgrid_calculate_vskip:n { #1 }
+    }
+    \zref@labelbyprops {#1-vskip}{ufgridvskip}
+    %insert the vskip
+    \vspace*{\l__ufgrid_vskip_int sp}
+    %\vskip \l__ufgrid_vskip_int sp\relax
+    %\vskip 0pt
+   }
+ }
+
+\cs_new_protected:Nn \__ufgrid_insert_ufgridstrut:n {\rule{0pt}{\dim_eval:n { \l__ufgrid_setup_step_tl sp + \topskip }}}
+
+
+%vertical version
+\cs_new_protected:Nn \__ufgrid_returntogrid_v:
+{
+   \bool_if:NT \l__ufgrid_autolabel_bool
+   {
+    \int_gincr:N \g__ufgrid_vpoint_int
+    \tl_set:Nn  \l__ufgrid_label_tl
+     {
+      \g__ufgrid_prefix_vpoint_tl \int_use:N\g__ufgrid_vpoint_int
+     }
+   }
+  \bool_if:NT\l__ufgrid_insert_vskip_bool
+   {
+    \__ufgrid_insert_vskip:n { \l__ufgrid_label_tl }
+   }
+  \bool_if:NT\l__ufgrid_savepos_bool
+   {
+    \__ufgrid_savepos:n { \l__ufgrid_label_tl }
+   }
+}
+
+
+\cs_new_protected:Nn \__ufgrid_settabpositions:nn %#1 name #2 list of spaces
+ {
+  \seq_set_from_clist:Nn \l_tmpa_seq {#2}
+  \seq_new:c {g__ufgrid_tabpos_#1_seq}
+  \int_set:Nn\l__ufgrid_tempa_int {1}
+  \makebox[0pt][l]
+  {
+   \seq_map_inline:Nn \l_tmpa_seq
+    {
+     \zsaveposx{\g__ufgrid_prefix_tabpos_tl#1\int_use:N\l__ufgrid_tempa_int}
+     \bool_if:NT \l__ufgrid_debug_tab_bool
+     {
+       \__ufgrid_debug_showtabs:n { #1 }
+     }
+     \hspace*{\dim_eval:n{##1}}
+     \int_incr:N\l__ufgrid_tempa_int
+    }
+   \zsaveposx{\g__ufgrid_prefix_tabpos_tl#1\int_use:N\l__ufgrid_tempa_int}
+   \bool_if:NT \l__ufgrid_debug_tab_bool
+     {
+       \__ufgrid_debug_showtabs:n { #1 }
+     }
+  \int_step_inline:nnnn {1}{1}{\l__ufgrid_tempa_int}
+   {
+    \seq_gput_right:cx {g__ufgrid_tabpos_#1_seq} {\zposx{\g__ufgrid_prefix_tabpos_tl#1##1}}
+   }
+  }
+ }
+
+
+
+\cs_new_protected:Nn \__ufgrid_returntogrid_h:n %#1 name
+{
+ \seq_if_exist:cF { g__ufgrid_tabpos_#1_seq }
+  {
+    \msg_error:nnx { ufgrid } {tab-list-unknown} { #1}
+  }
+ \bool_if:NT \l__ufgrid_autolabel_bool
+   {
+    \int_gincr:N \g__ufgrid_hpoint_int
+    \tl_set:Nn  \l__ufgrid_label_tl
+     {
+      \g__ufgrid_prefix_hpoint_tl \int_use:N\g__ufgrid_hpoint_int
+     }
+   }
+ \leavevmode\zsaveposx{\l__ufgrid_label_tl}
+ \tl_set:Nx \l__ufgrid_curpos_tl
+  {
+   \zref@extractdefault {\l__ufgrid_label_tl} {posx} {-1}
+  }
+ \int_compare:nNnF { \l__ufgrid_curpos_tl } {=}{-1}
+  {
+   \bool_set_false:N \l__ufgrid_tabfound_bool
+   \int_step_inline:nn { \seq_count:c { g__ufgrid_tabpos_#1_seq }-1 }
+   {
+    \int_compare:nT
+    { \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 }
+      <
+      \l__ufgrid_curpos_tl
+      <
+      \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 +1 }
+    }
+    {
+     \bool_set_true:N \l__ufgrid_tabfound_bool
+     \hspace*
+      {
+       \int_eval:n
+        {
+         \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 +1 }
+         -
+         \l__ufgrid_curpos_tl
+        }sp
+      }
+    }
+   }
+   \bool_if:NT \l__ufgrid_hfill_bool
+   {
+    \int_step_inline:nn { \seq_count:c { g__ufgrid_tabpos_#1_seq }}
+    {
+     \int_compare:nT
+     {
+      \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 }
+      =
+      \l__ufgrid_curpos_tl
+     }
+     {
+      \bool_set_true:N \l__ufgrid_tabfound_bool
+     }
+    }
+    \bool_if:NF \l__ufgrid_tabfound_bool {\hfill}
+   }
+  }
+}
+
+
+
+\cs_new_protected:Nn \__ufgrid_returntogrid:n
+{
+ \group_begin:
+ \bool_if:NT \g__ufgrid_active_bool
+ {
+  \keys_set:nn { ufgrid / use }
+  {
+   __autolabel,__savepos=true,__insert_vskip=true,hmode=false,
+   #1
+  }
+  \bool_if:NTF \l__ufgrid_hmode_bool
+   {
+    \__ufgrid_returntogrid_h:n { \l__ufgrid_tab_list_tl }
+   }
+   {
+    \__ufgrid_returntogrid_v:
+   }
+  }
+ \group_end:
+}
+
+
+\NewDocumentCommand\returntogrid{ O {} }
+ {
+   \__ufgrid_returntogrid:n { #1 }
+ }
+
+
+
+
+\NewDocumentCommand\returntogridsetup { m }
+ {
+  \keys_set:nn { ufgrid / setup } { #1}
+ }
+
+\NewDocumentCommand \showdebugpagegrid {}
+ {
+ \cs_if_exist:NTF\tikzpicture
+  {
+  \begin{tikzpicture}[overlay]
+   \draw[dotted,red]
+     (0,0) --++ (\textwidth,0cm);
+   \tl_set:Nx \l_tmpa_tl {\fp_eval:n {
+    trunc (
+     (\dim_to_decimal_in_sp:n {\textheight} -  \l__ufgrid_setup_offset_tl )
+     /
+    \l__ufgrid_setup_step_tl
+         )
+          }}
+   \foreach\x in {0,1,2,...,\l_tmpa_tl}
+    {
+     \draw[red,dashed]
+     (0,\fp_eval:n {-\l__ufgrid_setup_offset_tl-(\x*\l__ufgrid_setup_step_tl)}sp) --++ (\textwidth,0cm);
+    }
+  \end{tikzpicture}%
+  }
+  {
+   \msg_warning:nn {ufgrid} {tikz-needed}
+  }
+ }
+
+\cs_new_protected:Nn \__ufgrid_debug_showtabs:n
+{
+ \cs_if_exist:NTF\tikzpicture
+  {
+  \tikz[overlay]
+   \l__ufgrid_debug_tab_draw_tl;
+  }
+  {
+   \msg_warning:nn {ufgrid} {tikz-needed}
+  }
+ }
+
+
+\AddToShipoutPictureBG*{\AtTextUpperLeft{\zsaveposy{\g__ufgrid_prefix_vpoint_tl textupperleft}}}
+
+ \endinput
