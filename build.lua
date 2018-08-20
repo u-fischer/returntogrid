@@ -9,11 +9,30 @@ checkengines = {"pdftex", "luatex"}
 checkconfigs = {"build"}
 checkruns = 5
 
-sourcefiledir = "./source"
-
 tagfiles = {"source/*.md",
             "source/**/*.sty",
-            "source/*.tex"}
+            "source/*.tex",
+            "source/**/*.lua"}
+
+sourcefiledir = "./source"
+docfiledir = "./source"
+
+typesetfiles = {"returntogrid.tex"}
+typesetruns =  10
+
+docfiles = {"source/*.tex", "source/*.pdf"}
+
+textfiles= {"source/README.md"}
+packtdszip   = false
+installfiles = {
+                "**/*.sty","**/*.lua"
+               }  
+               
+sourcefiles  = {
+                "**/*.sty",
+                "**/*.lua"
+               }
+            
 
 function update_tag (file,content,tagname,tagdate)
  tagdate = string.gsub (packagedate,"-", "/")
@@ -55,19 +74,8 @@ function update_tag (file,content,tagname,tagdate)
  return content
  end
 
--- ctan setup
-
-textfiles= {"source/README.md"}
-packtdszip   = false
-installfiles = {
-                "**/*.sty","**/*.lua"
-               }  
-               
-sourcefiles  = {
-                "**/*.sty",
-               }
                             
-typesetfiles = {"source/returntogrid.tex"}
+
 
 kpse.set_program_name ("kpsewhich")
 if not release_date then

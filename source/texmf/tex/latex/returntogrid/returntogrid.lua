@@ -1,5 +1,7 @@
--- lua file for returntogrid.
--- 15.08.2018
+-- Packageversion: 0.1
+-- Packagedate: 2018/08/20
+-- returntogrid.lua
+-- Ulrike Fischer
 
 returntogrid = returntogrid or {}
 

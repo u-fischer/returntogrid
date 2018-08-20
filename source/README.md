@@ -1,6 +1,6 @@
 #returntogrid — A package to return some text to a grid
 Packageversion: 0.1 
-Packagedate: 2018/08/12
+Packagedate: 2018/08/20
 Author: Ulrike Fischer
 
 ## License
