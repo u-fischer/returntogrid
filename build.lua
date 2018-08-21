@@ -1,6 +1,6 @@
 -- Build script for returntogrid
-packageversion="0.1"
-packagedate="2018/08/20"
+packageversion="0.2"
+packagedate="2018/08/21"
 
 module   = "returntogrid"
 ctanpkg  = "returntogrid"

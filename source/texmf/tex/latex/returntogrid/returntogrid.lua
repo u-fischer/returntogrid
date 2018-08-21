@@ -1,5 +1,5 @@
--- Packageversion: 0.1
--- Packagedate: 2018/08/20
+-- Packageversion: 0.2
+-- Packagedate: 2018/08/21
 -- returntogrid.lua
 -- Ulrike Fischer
 

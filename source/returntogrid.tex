@@ -1,7 +1,7 @@
 % !Mode:: "TeX:UTF-8:Main"
 \makeatletter
-\def\UlrikeFischer@package@version{0.1}
-\def\UlrikeFischer@package@date{2018/08/20}
+\def\UlrikeFischer@package@version{0.2}
+\def\UlrikeFischer@package@date{2018/08/21}
 \makeatother
 %\PassOptionsToPackage{enable-debug}{expl3}
 \documentclass[twoside,parskip=half-,fontsize=12pt,egregdoesnotlikesansseriftitles,headings=normal]{scrartcl}
@@ -27,7 +27,7 @@
 \lstset{basicstyle=\ttfamily, columns=fullflexible,language=[LaTeX]TeX,aboveskip=0pt}
 
 \makeatletter
-\lst@AddToHook{PreInit}{\returntogrid} %works here but should be checked. A local key would be better. 
+\lst@AddToHook{PreInit}{\returntogrid} %works here but should be checked. A local key would be better.
 
 \begin{document}
 \maketitle
@@ -213,7 +213,15 @@ As with vertical movements \cs{returntogrid} has a number of restrictions:
 \item Don't misuse the command! It is not a replacement for a real tabular or a tabbing as many \cs{returntogrid} in one line or one paragraph can mean many compilations. But it is useful if you want to move e.g. graphics in a three column layout.
 \end{itemize}
 
+\subsection{The twoside problem}\label{sec:twoside}
 
+Like with vertical grid movements changes of the page geometry can lead to nonsensical results: The tab positions are stored in coordinates which are measured from the left side of the page. 
+
+Unlike as the situation with vertical grids geometry changes are actual common:  a twoside document has different margins on the odd and even page. Normally you want the tab position to be relative to the text margins, so an offset is needed. 
+
+It \pkg{returntogrid} detects the twoside mode, or you use the \PrintKeyName{twoside} key in the setup command, \pkg{returntogrid} will add the difference between oddsidemargin and evensidemargin as an offset when needed. The code assumes that the page geometry of odd and even pages don't change in the middle of the document!
+
+ 
 
 \section{Setup and configuration}\label{sec:setup}
 
@@ -241,6 +249,8 @@ With this command you can change some defaults of the package.
 \item[\PrintKeyName{tab-list}] Value a name. This sets the name of tab-list that will be used if you don't give a name explictely until the enclosing group end.
 
 \item[\PrintKeyName{hfill}] Boolean. Default is true. When set to false no \cs{\hfill} is inserted after the last tab position.
+
+\item[\PrintKeyName{twoside}] Boolean. This activates/deactivates the offset described in \ref{sec:twoside} in case the automatic detection doesn't do what you want. 
 
  \item[\PrintKeyName{debug-tab}] This helps to see horizontal tabs when defining them. It should be used before using   \PrintKeyName{settabpositions}. It needs the package \pkg{tikz}.
 \end{description}
@@ -371,7 +381,7 @@ some text \\some text\\some text
 
 abc \\abc
 
-\newpage 
+\newpage
 \ClearShipoutPictureBG
 \minisec{The code}
 \begin{lstlisting}
