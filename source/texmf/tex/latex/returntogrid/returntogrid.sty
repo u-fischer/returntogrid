@@ -18,6 +18,7 @@
 \int_new:N       \g__ufgrid_vpoint_int %for the v-labels
 \int_new:N       \g__ufgrid_hpoint_int   %for the h-labels of tabs
 \int_new:N       \l__ufgrid_tempa_int
+\int_new:N       \l__ufgrid_tab_cor_int
 
 \bool_new:N      \g__ufgrid_active_bool
 \bool_gset_true:N \g__ufgrid_active_bool
@@ -28,6 +29,9 @@
 \bool_new:N      \l__ufgrid_tabfound_bool
 \bool_new:N      \l__ufgrid_hfill_bool
 \bool_new:N      \l__ufgrid_debug_tab_bool
+\bool_new:N      \g__ufgrid_twoside_bool
+
+\if@twoside \bool_gset_true:N \g__ufgrid_twoside_bool \fi
 
 \tl_new:N        \l__ufgrid_setup_step_tl   %step value (dim in sp)
 \tl_new:N        \l__ufgrid_setup_reference_tl %name of reference point
@@ -52,8 +56,10 @@
 
 % we need to store the current displacement
 \zref@newprop {ufgridvskip}[0]{\int_use:N \l__ufgrid_vskip_int}
+\zref@newprop*{pagecnt} [1] {\the\c@page}
 \zref@addprop {savepos} {ufgridvskip}
 \zref@addprop {savepos} {abspage}
+\zref@addprop {savepos} {pagecnt}
 
 
 \keys_define:nn { ufgrid / setup}
@@ -83,7 +89,8 @@
      \tl_set:Nn \l__ufgrid_tab_list_tl {#1}
     }
     \bool_set_true:N \l__ufgrid_hmode_bool
-   }
+   },
+ twoside          .bool_gset:N = \g__ufgrid_twoside_bool
 }
 
 \normalsize %just in case
@@ -230,7 +237,7 @@
   {
    \seq_map_inline:Nn \l_tmpa_seq
     {
-     \zsaveposx{\g__ufgrid_prefix_tabpos_tl#1\int_use:N\l__ufgrid_tempa_int}
+     \zsavepos{\g__ufgrid_prefix_tabpos_tl#1\int_use:N\l__ufgrid_tempa_int}
      \bool_if:NT \l__ufgrid_debug_tab_bool
      {
        \__ufgrid_debug_showtabs:n { #1 }
@@ -238,7 +245,7 @@
      \hspace*{\dim_eval:n{##1}}
      \int_incr:N\l__ufgrid_tempa_int
     }
-   \zsaveposx{\g__ufgrid_prefix_tabpos_tl#1\int_use:N\l__ufgrid_tempa_int}
+   \zsavepos{\g__ufgrid_prefix_tabpos_tl#1\int_use:N\l__ufgrid_tempa_int}
    \bool_if:NT \l__ufgrid_debug_tab_bool
      {
        \__ufgrid_debug_showtabs:n { #1 }
@@ -266,22 +273,47 @@
       \g__ufgrid_prefix_hpoint_tl \int_use:N\g__ufgrid_hpoint_int
      }
    }
- \leavevmode\zsaveposx{\l__ufgrid_label_tl}
+ \leavevmode\zsavepos{\l__ufgrid_label_tl}
  \tl_set:Nx \l__ufgrid_curpos_tl
   {
    \zref@extractdefault {\l__ufgrid_label_tl} {posx} {-1}
   }
+ \bool_if:NT \g__ufgrid_twoside_bool
+ {
+  \int_if_odd:nTF
+   {
+    \zref@extractdefault {\l__ufgrid_label_tl} {pagecnt} {1}
+    -
+    \zref@extractdefault {\g__ufgrid_prefix_tabpos_tl#1 1} {pagecnt} {1}
+   }
+   {
+    % tab setting and current pos are on different page types.
+    \int_if_even:nTF
+    {
+      \zref@extractdefault {\g__ufgrid_prefix_tabpos_tl#1 1} {pagecnt} {1}
+    }
+    {
+      \int_set:Nn \l__ufgrid_tab_cor_int {\dim_to_decimal_in_sp:n {\oddsidemargin-\evensidemargin}}
+    }
+    {
+      \int_set:Nn \l__ufgrid_tab_cor_int {\dim_to_decimal_in_sp:n {\evensidemargin-\oddsidemargin}}
+    }
+   }
+   {
+     \int_set:Nn \l__ufgrid_tab_cor_int {0}
+   }
+ }
  \int_compare:nNnF { \l__ufgrid_curpos_tl } {=}{-1}
   {
    \bool_set_false:N \l__ufgrid_tabfound_bool
    \int_step_inline:nn { \seq_count:c { g__ufgrid_tabpos_#1_seq }-1 }
    {
     \int_compare:nT
-    { \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 }
+    { (\seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 } + \l__ufgrid_tab_cor_int)
       <
       \l__ufgrid_curpos_tl
       <
-      \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 +1 }
+      (\seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 +1 } + \l__ufgrid_tab_cor_int)
     }
     {
      \bool_set_true:N \l__ufgrid_tabfound_bool
@@ -289,7 +321,7 @@
       {
        \int_eval:n
         {
-         \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 +1 }
+         \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 +1 } + \l__ufgrid_tab_cor_int
          -
          \l__ufgrid_curpos_tl
         }sp
@@ -302,7 +334,7 @@
     {
      \int_compare:nT
      {
-      \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 }
+      \seq_item:cn { g__ufgrid_tabpos_#1_seq } { ##1 } + \l__ufgrid_tab_cor_int
       =
       \l__ufgrid_curpos_tl
      }

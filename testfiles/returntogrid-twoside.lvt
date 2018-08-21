@@ -1,0 +1,33 @@
+% !Mode:: "TeX:DE:UTF-8:Main"
+%\input{regression-test}
+\documentclass{book}
+\usepackage{returntogrid}
+\usepackage{geometry,tikz}
+\geometry{showframe,outer=4cm}
+
+\begin{document}
+
+\returntogridsetup{
+ debug-tab,
+ settabpositions={odd}{1cm,2cm,3cm},
+ tab-list={odd}
+ }
+
+x\returntogrid[tab]x\returntogrid[tab]x\returntogrid[tab]x
+
+\newpage
+\returntogridsetup{
+ debug-tab,
+ settabpositions={even}{1cm,2cm,3cm},
+ }
+
+
+x\returntogrid[tab]x\returntogrid[tab]x\returntogrid[tab]x
+
+\newpage 
+
+\returntogridsetup{tab-list=even,settabpositions={debug}{1cm,2cm,3cm}}
+
+x\returntogrid[tab]x\returntogrid[tab]x\returntogrid[tab]x
+
+\end{document}
