@@ -1,6 +1,6 @@
 \RequirePackage{xparse}
 
-\ProvidesExplPackage {returntogrid} {2018/08/21} {0.2}
+\ProvidesExplPackage {returntogrid} {2019/09/23} {0.3}
  {return to a grid position}
 % \debug_on:n { check-expressions,deprecation } % needs enable-debug
 \RequirePackage{eso-pic}
@@ -384,12 +384,14 @@
   \keys_set:nn { ufgrid / setup } { #1}
  }
 
+\colorlet{ufgrid@debugcolor}{red}
+
 \NewDocumentCommand \showdebugpagegrid {}
  {
  \cs_if_exist:NTF\tikzpicture
   {
   \begin{tikzpicture}[overlay]
-   \draw[dotted,red]
+   \draw[dotted,ufgrid@debugcolor]
      (0,0) --++ (\textwidth,0cm);
    \tl_set:Nx \l_tmpa_tl {\fp_eval:n {
     trunc (
@@ -400,7 +402,7 @@
           }}
    \foreach\x in {0,1,2,...,\l_tmpa_tl}
     {
-     \draw[red,dashed]
+     \draw[ufgrid@debugcolor,dashed]
      (0,\fp_eval:n {-\l__ufgrid_setup_offset_tl-(\x*\l__ufgrid_setup_step_tl)}sp) --++ (\textwidth,0cm);
     }
   \end{tikzpicture}%

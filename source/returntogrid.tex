@@ -157,6 +157,12 @@ This command requires that you load the package \pkg{tikz}. You can then use it 
 \AddToShipoutPictureBG {\AtTextUpperLeft{\showdebugpagegrid}}
 \end{lstlisting}
 
+By default the grid lines are red. But you can change the color by redeclaring the color \texttt{ufgrid@debugcolor}:
+
+\begin{lstlisting}
+\colorlet{ufgrid@debugcolor}{blue}
+\end{lstlisting}
+
 
 \section{Horizontal grid: going to the next tab position}\label{sec:nextgridtab}
 
@@ -215,13 +221,13 @@ As with vertical movements \cs{returntogrid} has a number of restrictions:
 
 \subsection{The twoside problem}\label{sec:twoside}
 
-Like with vertical grid movements changes of the page geometry can lead to nonsensical results: The tab positions are stored in coordinates which are measured from the left side of the page. 
+Like with vertical grid movements changes of the page geometry can lead to nonsensical results: The tab positions are stored in coordinates which are measured from the left side of the page.
 
-Unlike as the situation with vertical grids geometry changes are actual common:  a twoside document has different margins on the odd and even page. Normally you want the tab position to be relative to the text margins, so an offset is needed. 
+Unlike as the situation with vertical grids geometry changes are actual common:  a twoside document has different margins on the odd and even page. Normally you want the tab position to be relative to the text margins, so an offset is needed.
 
 It \pkg{returntogrid} detects the twoside mode, or you use the \PrintKeyName{twoside} key in the setup command, \pkg{returntogrid} will add the difference between oddsidemargin and evensidemargin as an offset when needed. The code assumes that the page geometry of odd and even pages don't change in the middle of the document!
 
- 
+
 
 \section{Setup and configuration}\label{sec:setup}
 
@@ -250,7 +256,7 @@ With this command you can change some defaults of the package.
 
 \item[\PrintKeyName{hfill}] Boolean. Default is true. When set to false no \cs{\hfill} is inserted after the last tab position.
 
-\item[\PrintKeyName{twoside}] Boolean. This activates/deactivates the offset described in \ref{sec:twoside} in case the automatic detection doesn't do what you want. 
+\item[\PrintKeyName{twoside}] Boolean. This activates/deactivates the offset described in \ref{sec:twoside} in case the automatic detection doesn't do what you want.
 
  \item[\PrintKeyName{debug-tab}] This helps to see horizontal tabs when defining them. It should be used before using   \PrintKeyName{settabpositions}. It needs the package \pkg{tikz}.
 \end{description}
